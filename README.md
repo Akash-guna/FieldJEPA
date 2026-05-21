@@ -24,7 +24,8 @@ The diagram below illustrates the three masking strategies explored in this work
 **Field Masking** zeros all channels of a physical attribute (e.g. velocity) at a
 designated timestep. **Channel Masking** zeros a single random channel. **Field
 Inverse Target** additionally masks the target encoder to only the masked field's
-channels at t+1, forcing cross-modal temporal prediction.
+channels at t+1, forcing cross-modal temporal prediction. Field Masking worked best 
+among the proposed strategies.
 
 ![Architecture diagram: Field Masking, Channel Masking, and Field Inverse Target strategies](architecture.png)
 
@@ -56,6 +57,9 @@ complete next-frame state from any partial observation.
 Field masking is applied at 50% of steps, alternating with standard unmasked JEPA
 steps to preserve stable temporal prediction as the primary objective.
 
+## Masking Frequency
+
+Field masking is applied at every other training step (`mask_period: 2`, i.e. 50% of steps), alternating with standard unmasked JEPA steps. Masking at every step was found to degrade representation quality: the encoder collapses toward inter-field inference, encoding each field only implicitly through its correlations with others rather than maintaining a self-sufficient representation. Alternating ensures the primary temporal-prediction objective remains stable while the masking objective provides a regularising signal that encourages field-disentangled representations.
 
 ---
 
