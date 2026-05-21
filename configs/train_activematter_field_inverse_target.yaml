@@ -1,0 +1,82 @@
+# Field Inverse Target — Active Matter
+# Extension of Field JEPA where the TARGET encoder is also restricted.
+# At each masked step:
+#   - Context:  all channels of a randomly chosen physical field are zeroed (same as Field JEPA).
+#   - Target:   ONLY the channels belonging to the masked field survive at t+1;
+#               all other channels are zeroed in the target input.
+# This forces the model to perform cross-modal temporal prediction: given a context
+# with field k absent, predict field k's latent representation at the next timestep.
+# Masking is applied every other step (mask_period: 2) to preserve stable temporal
+# prediction as the primary objective.
+#
+# Active Matter channel layout (11 channels):
+#   Field 0 — concentration (c):          [0]
+#   Field 1 — velocity (U):               [1, 2]
+#   Field 2 — orientation tensor (D):     [3, 4, 5, 6]
+#   Field 3 — strain-rate tensor (E):     [7, 8, 9, 10]
+
+defaults:
+  - dataset: active_matter
+  - model: conv_small
+  - ft: linear
+
+dataset:
+  num_frames: 16
+
+model:
+  objective: "jepa"
+  dims: [16, 32, 64, 128, 128]
+  num_res_blocks: [3, 3, 3, 9, 3]
+
+train:
+  num_epochs: 30
+  batch_size: 4        # per-device; 11-channel input is memory-intensive
+  report_every: 100
+  save_every: 2
+  include_labels: false
+
+  # VICReg loss coefficients
+  sim_coeff: 2
+  std_coeff: 40
+  cov_coeff: 2
+
+  predict_n_steps: false
+  lr_scheduler: "cosine"
+  lr_scheduler_warmup_epochs: 2
+  min_lr: 1e-6
+  lr: 1e-3             # follows 1e-3 × global_batch_size/256 rule
+  weight_decay: 0.05
+  noise_std: 1.0
+
+  # --- Field Inverse Target masking settings ---
+  field_masked: true     # zero all channels of a randomly chosen physical field in context
+  channel_masked: false
+  inverse_target: true   # restrict target to ONLY the masked field's channels at t+1
+  learnable_mask: false  # use hard zeros; set true for a learned scalar mask token
+  mask_period: 2         # apply mask once every N steps (50 % masking rate)
+  ema_momentum: 0.996    # target-encoder EMA momentum
+
+  # Field definitions (mirrors JepaTrainer hardcoded defaults; kept here for documentation)
+  # num_fields: 4
+  # fields: [[0], [1, 2], [3, 4, 5, 6], [7, 8, 9, 10]]
+
+  run_name: "activematter-field-inverse-target"
+  distributed: true
+
+ft:
+  task: "regression"
+  use_attentive_pooling: true
+  lr_scheduler: "cosine"
+  lr_scheduler_warmup_epochs: 2
+  min_lr: 0
+  lr: 1e-3
+  weight_decay: 0.01
+  noise_std: 1.0
+  field_masked: true
+  inverse_target: true
+  run_name: "activematter-field-inverse-target-FT"
+  distributed: false
+
+wandb_project: "physics-jepa"
+out_path: "./checkpoints"
+cache_path: "./dataset_cache"

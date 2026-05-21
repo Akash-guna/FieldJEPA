@@ -1,0 +1,78 @@
+# Field JEPA — Active Matter
+# At each step, one physical field (concentration / velocity / orientation / strain)
+# is chosen uniformly at random and ALL its channels are zeroed in the context input.
+# The prediction target remains the FULL next-frame latent representation.
+# Masking is applied every other step (mask_period: 2) so that standard temporal
+# prediction remains the primary objective.
+#
+# Active Matter channel layout (11 channels):
+#   Field 0 — concentration (c):          [0]
+#   Field 1 — velocity (U):               [1, 2]
+#   Field 2 — orientation tensor (D):     [3, 4, 5, 6]
+#   Field 3 — strain-rate tensor (E):     [7, 8, 9, 10]
+
+defaults:
+  - dataset: active_matter
+  - model: conv_small
+  - ft: linear
+
+dataset:
+  num_frames: 16
+
+model:
+  objective: "jepa"
+  dims: [16, 32, 64, 128, 128]
+  num_res_blocks: [3, 3, 3, 9, 3]
+
+train:
+  num_epochs: 30
+  batch_size: 4        # per-device; 11-channel input is memory-intensive
+  report_every: 100
+  save_every: 2
+  include_labels: false
+
+  # VICReg loss coefficients
+  sim_coeff: 2
+  std_coeff: 40
+  cov_coeff: 2
+
+  predict_n_steps: false
+  lr_scheduler: "cosine"
+  lr_scheduler_warmup_epochs: 2
+  min_lr: 1e-6
+  lr: 1e-3             # follows 1e-3 × global_batch_size/256 rule
+  weight_decay: 0.05
+  noise_std: 1.0
+
+  # --- Field JEPA masking settings ---
+  field_masked: true   # zero all channels of a randomly chosen physical field
+  channel_masked: false
+  inverse_target: false  # target = full next-frame latent (not restricted to masked field)
+  learnable_mask: false  # use hard zeros; set true to use a learned scalar mask token
+  mask_period: 2         # apply mask once every N steps (50 % masking rate)
+  ema_momentum: 0.996    # target-encoder EMA momentum
+
+  # Field definitions (mirrors JepaTrainer hardcoded defaults; kept here for documentation)
+  # num_fields: 4
+  # fields: [[0], [1, 2], [3, 4, 5, 6], [7, 8, 9, 10]]
+
+  run_name: "activematter-field-jepa"
+  distributed: true
+
+ft:
+  task: "regression"
+  use_attentive_pooling: true
+  lr_scheduler: "cosine"
+  lr_scheduler_warmup_epochs: 2
+  min_lr: 0
+  lr: 1e-3
+  weight_decay: 0.01
+  noise_std: 1.0
+  field_masked: true
+  inverse_target: false
+  run_name: "activematter-field-jepa-FT"
+  distributed: false
+
+wandb_project: "physics-jepa"
+out_path: "./checkpoints"
+cache_path: "./dataset_cache"

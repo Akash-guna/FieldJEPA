@@ -1,0 +1,72 @@
+# Channel JEPA — Active Matter
+# A single random channel (out of 11) is zeroed in the context input at every step.
+# The prediction target is the full next-frame latent representation.
+# This is a finer-grained masking strategy compared to Field JEPA — individual
+# channels are masked independently rather than masking entire physical fields.
+#
+# Active Matter channel layout (11 channels):
+#   [0]        — concentration (c)
+#   [1, 2]     — velocity (ux, uy)
+#   [3–6]      — orientation tensor (D11, D12, D21, D22)
+#   [7–10]     — strain-rate tensor (E11, E12, E21, E22)
+
+defaults:
+  - dataset: active_matter
+  - model: conv_small
+  - ft: linear
+
+dataset:
+  num_frames: 16
+
+model:
+  objective: "jepa"
+  dims: [16, 32, 64, 128, 128]
+  num_res_blocks: [3, 3, 3, 9, 3]
+
+train:
+  num_epochs: 30
+  batch_size: 4        # per-device; 11-channel input is memory-intensive
+  report_every: 100
+  save_every: 2
+  include_labels: false
+
+  # VICReg loss coefficients
+  sim_coeff: 2
+  std_coeff: 40
+  cov_coeff: 2
+
+  predict_n_steps: false
+  lr_scheduler: "cosine"
+  lr_scheduler_warmup_epochs: 2
+  min_lr: 1e-6
+  lr: 1e-3             # follows 1e-3 × global_batch_size/256 rule
+  weight_decay: 0.05
+  noise_std: 1.0
+
+  # --- Channel JEPA masking settings ---
+  channel_masked: true   # zero one randomly chosen channel per step
+  field_masked: false
+  inverse_target: false
+  learnable_mask: false  # use hard zeros; set true for a learned scalar mask token
+  ema_momentum: 0.996    # target-encoder EMA momentum
+
+  run_name: "activematter-channel-jepa"
+  distributed: true
+
+ft:
+  task: "regression"
+  use_attentive_pooling: true
+  lr_scheduler: "cosine"
+  lr_scheduler_warmup_epochs: 2
+  min_lr: 0
+  lr: 1e-3
+  weight_decay: 0.01
+  noise_std: 1.0
+  channel_masked: true
+  inverse_target: false
+  run_name: "activematter-channel-jepa-FT"
+  distributed: false
+
+wandb_project: "physics-jepa"
+out_path: "./checkpoints"
+cache_path: "./dataset_cache"
