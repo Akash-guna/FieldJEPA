@@ -281,7 +281,8 @@ Run-name conventions:
 - `activematter-supervised-baseline-FT-knn` — supervised encoder + kNN
 
 ---
-
+##Report
+The full project report can be viewed in "Report.pdf".
 ## References
 
 - [V-JEPA 2 (Bardes et al., 2025)](https://arxiv.org/abs/2404.08471)
